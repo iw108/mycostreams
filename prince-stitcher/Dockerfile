@@ -10,14 +10,16 @@ RUN apt-get update && apt-get install -y \
 # Retrieve ImageJ and source code
 WORKDIR /opt/fiji
 
-RUN wget https://downloads.imagej.net/fiji/latest/fiji-nojre.zip \
-    && unzip fiji-nojre.zip \
+RUN wget -nv https://downloads.imagej.net/fiji/latest/fiji-nojre.zip \
+    && unzip -q fiji-nojre.zip \
     && rm fiji-nojre.zip \
     && rm Fiji.app/*.exe
 
 
 # The builder image, used to build the virtual environment
-FROM python:3.10-bullseye as builder
+FROM python:3.12-bullseye as builder
+
+ARG INSTALL_DEV=false
 
 ENV POETRY_VERSION=1.4.2 \
     POETRY_HOME=/opt/poetry \
@@ -34,12 +36,13 @@ WORKDIR /app
 
 COPY pyproject.toml poetry.lock ./
 
-RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
+RUN bash -c "if [ $INSTALL_DEV == 'true' ] ; then poetry install --no-root ; else poetry install --no-root --only main ; fi"
 
 
 # The runtime image, used to just run the code provided its virtual environment
-FROM python:3.10-slim-bullseye as runtime
+FROM python:3.12-slim-bullseye as runtime
 
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
 ENV VENV_PATH=/app/.venv
 ENV PATH=$VENV_PATH/bin:$PATH
 ENV FIJI_HOME=/opt/fiji/Fiji.app

@@ -11,8 +11,26 @@ from pydantic import BaseModel, Field
 
 
 @dataclass
-class Defaults:
-    """Configurable options for ImageJ plugin"""
+class AbstractParms:
+    """
+    Base parameters used for performing stitching.
+    """
+
+
+class AbstractStitcher(ABC):
+    """
+    Base class used to perform stitching.
+    """
+
+    @abstractmethod
+    def run_stitch(self, src_dir: Path, target: Path, params: AbstractParms): ...
+
+
+@dataclass
+class Params:
+    """
+    Configurable options for ImageJ plugin.
+    """
 
     grid_size_x: int = 15
     grid_size_y: int = 10
@@ -35,10 +53,10 @@ class Defaults:
 
 
 class _PluginParams(BaseModel):
-    """Params to be passed into ImageJ plugin.
+    """
+    Params to be passed into ImageJ plugin.
 
     Note: Order for plugin is highly important
-
     """
 
     PLUGIN: ClassVar[str] = "Stitch Sequence of Grids of Images"
@@ -68,45 +86,25 @@ class _PluginParams(BaseModel):
     absolute_displacement_threshold: int
 
 
-@contextmanager
-def set_working_dir() -> Generator[None, None, None]:
-    """Ensure we keep working dir fixed."""
-
-    current_dir = Path.cwd()
-
-    yield
-
-    os.chdir(current_dir)
-
-
-class AbstractStitcher(ABC):
-
-    @abstractmethod
-    def run_stitch(params, src_dir: Path, target: Path): ...
-
-
 class Stitcher(AbstractStitcher):
+    """
+    Stitcher class which wraps around Fiji.
+    """
 
     def __init__(
         self,
-        defaults: Defaults | None = None,
         fiji_home: str | None = None,
     ):
-        self.defaults = defaults or Defaults()
+        self.ij = imagej.init(fiji_home or os.getenv("FIJI_HOME", "Fiji.app"))
 
-        # NOTE: For local Fiji installations `pyimagej` tries to change
-        # the working dir to the app directory. We do not want this.
-        with set_working_dir():
-            self.ij = imagej.init(fiji_home or os.getenv("FIJI_HOME", "Fiji.app"))
-
-    def run_stitch(self, src_dir: Path, target: Path):
+    def run_stitch(self, src_dir: Path, target: Path, params: Params):
         with TemporaryDirectory() as _temp_dir:
             temp_dir = Path(_temp_dir)
 
             plugin_params = _PluginParams(
                 input_dir=src_dir,
                 output_dir=temp_dir,
-                **self.defaults.__dict__,
+                **params.__dict__,
             )
 
             self.ij.py.run_plugin(
@@ -117,3 +115,9 @@ class Stitcher(AbstractStitcher):
             # Move the stitched image to the target directory
             stitched_image = next(temp_dir.iterdir())
             stitched_image.rename(target)
+
+    @contextmanager
+    def gateway_lifespan(self) -> Generator[None, None, None]:
+        yield
+
+        self.ij.dispose()
