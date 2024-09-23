@@ -42,6 +42,7 @@ async def main():
 
             src_dir = v2.SrcDirInfo(
                 local_path=Path(timestep.local_dir),
+                staging_path=None,
                 img_count=timestep.img_count,
                 raw_metadata={},
                 imaging_event_id=imaging_event.id,

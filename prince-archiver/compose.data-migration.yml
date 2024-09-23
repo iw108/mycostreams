@@ -1,7 +1,7 @@
 services:
   data-migration:
     image: prince-archiver
-    command: sh -c "/app/run-data-migrations.sh"
+    command: "./run-data-migrations.sh"
     environment: 
       POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@db:5432/postgres
     depends_on:
