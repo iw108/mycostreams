@@ -58,7 +58,9 @@ stmt = (
 
 blacklist = {
     date(2024, 7, 19),  # first day
-    date(2024, 8, 30),  # last day
+    date(2024, 7, 20),  # first day
+    date(2024, 7, 21),
+    date(2024, 7, 22)
 }
 
 
