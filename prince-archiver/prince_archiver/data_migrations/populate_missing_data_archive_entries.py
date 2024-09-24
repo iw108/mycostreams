@@ -21,8 +21,13 @@ upload_dates_subquery = (
         v1.Timestep,
         onclause=v1.ObjectStoreEntry.timestep_id == v1.Timestep.timestep_id,
     )
+    .where(
+        func.date(v1.Timestep.created_at) >= date(2024, 7, 23),
+        func.date(v1.Timestep.created_at) < date.today(),
+    )
     .subquery()
 )
+
 
 archive_dates_subquery = (
     select(func.date(v1.Timestep.created_at).label("date"))
@@ -56,18 +61,15 @@ stmt = (
 )
 
 
-blacklist = {
-    date(2024, 7, 19),  # first day
-    date(2024, 7, 20),  # first day
-    date(2024, 7, 21),
-    date(2024, 7, 22)
-}
-
-
 async def main():
     logging.info("Populating missing data archive entries")
 
-    sessionmaker = get_session_maker(os.getenv("POSTGRES_DSN"))
+    sessionmaker = get_session_maker(
+        os.getenv(
+            "POSTGRES_DSN", 
+            "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres",
+        )
+    )
 
     job_id_mapping = defaultdict[date, UUID](uuid4)
 
@@ -76,7 +78,7 @@ async def main():
 
         missing_dates: set[date] = set(result.all())
 
-        for date_ in sorted(missing_dates - blacklist):
+        for date_ in sorted(missing_dates):
             result = await session.stream_scalars(
                 stmt.where(func.date(v1.Timestep.timestamp) == date_),
             )
