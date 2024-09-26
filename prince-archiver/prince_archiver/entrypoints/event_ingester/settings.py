@@ -1,13 +1,15 @@
+from datetime import timedelta
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from prince_archiver.config import AWSSettings
 
-
-class Settings(AWSSettings, BaseSettings):
+class Settings(BaseSettings):
     SRC_DIR: Path
-    STAGING_DIR: Path | None = None
+    COPY_TO_STAGING: bool = False
+
+    SRC_LIFESPAN: timedelta = timedelta(hours=8)
+    STAGING_LIFESPAN: timedelta = timedelta(days=24)
 
     model_config = SettingsConfigDict(
         env_file=".env",

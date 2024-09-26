@@ -13,23 +13,21 @@ x-log-labels: &log-labels
 
 
 services:
-  data-ingester:
+  event-ingester:
     environment:
       SENTRY_DSN: ${SENTRY_DSN}
-      WATCHFILES_FORCE_POLLING: "true"
     volumes:
-      - cifs_mount:/data/input/
+      - cifs_mount:/data/prince
     labels: *log-labels
     deploy:
       restart_policy:
         condition: on-failure
 
-  worker:
+  state-manager:
     environment:
-      <<: *aws-env-variables
       ARCHIVE_TRANSITION_DAYS: ${ARCHIVE_TRANSITION_DAYS:-2}
-      SENTRY_DSN: ${SENTRY_DSN}
       RABBITMQ_DSN: ${RABBITMQ_DSN}
+      SENTRY_DSN: ${SENTRY_DSN}
       SURF_USERNAME: ${SURF_USERNAME}
       SURF_PASSWORD: ${SURF_PASSWORD}
       WEBHOOK_URL: ${WEBHOOK_URL}
@@ -43,7 +41,7 @@ services:
       <<: *aws-env-variables
       SENTRY_DSN: ${SENTRY_DSN}
     volumes:
-      - cifs_mount:/data/input/:ro
+      - cifs_mount:/data/system/prince:ro
     labels: *log-labels
     deploy:
       restart_policy:
@@ -52,6 +50,18 @@ services:
   api:
     environment:
       <<: *aws-env-variables
+      SENTRY_DSN: ${SENTRY_DSN}
+
+  aws-cli:
+    image: amazon/aws-cli
+    environment:
+      <<: *aws-env-variables
+      AWS_DEFAULT_REGION: default
+    volumes:
+      - ${POSTGRES_BACKUP_DIR:-${PWD}/backups}:/aws/postgres
+      - redis_data:/aws/redis
+    profiles:
+      - tools
 
   alloy:
     image: grafana/alloy:latest
