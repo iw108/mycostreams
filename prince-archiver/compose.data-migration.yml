@@ -1,6 +1,6 @@
 services:
   data-migration:
-    image: prince-archiver
+    image: mycostreams/prince-archiver:${TAG:-latest}
     command: "./run-data-migrations.sh"
     environment: 
       POSTGRES_DSN: postgresql+asyncpg://postgres:postgres@db:5432/postgres
