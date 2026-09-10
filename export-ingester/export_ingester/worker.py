@@ -64,25 +64,31 @@ async def run_video_ingestion(ctx: dict, *, _date: date | None = None):
         await ingester.run_sbatch_command(settings.SBATCH_VIDEO_COMMAND)
 
 
+# `--mem=64G`, because the staging default is 7G per core and both archive crons were
+# OOM-killed at it on most days since 2026-09-03.
+#
+# 7G was never enough by design: `ExperimentFileSystem.batch_size` is -1, so `get_files`
+# asks s3fs for unbounded concurrency and pulls every tar of an experiment-date group at
+# once. Peak RSS therefore scales with the group, which nothing bounds. Raising the
+# ceiling stops the daily failures; bounding `batch_size` is the smaller-footprint fix
+# and wants a measurement of what the groups actually cost first.
+_ARCHIVE_SBATCH = (
+    "sbatch --time=22:00:00 --partition=staging --nodes=1 --ntasks=1 --mem=64G"
+    " --job-name=surf_archive"
+    " --output=archive_%j.out --error=archive_%j.err"
+    " --wrap='surf-archiver-cli archive --mode={mode}'"
+)
+
+
 async def run_archiving(ctx: dict, *, _date: date | None = None):
-    archive_command = (
-        "sbatch --time=22:00:00 --partition=staging "
-        "--nodes=1 --ntasks=1 --job-name=surf_archive"
-        " --output=archive_%j.out --error=archive_%j.err"
-        " --wrap='surf-archiver-cli archive --mode=images'"
-    )
+    archive_command = _ARCHIVE_SBATCH.format(mode="images")
     settings: Settings = ctx["settings"]
     async with get_managed_export_ingester(settings) as ingester:
         await ingester.run_sbatch_command(archive_command)
 
 
 async def run_video_archiving(ctx: dict, *, _date: date | None = None):
-    archive_command = (
-        "sbatch --time=22:00:00 --partition=staging "
-        "--nodes=1 --ntasks=1 --job-name=surf_archive"
-        " --output=archive_%j.out --error=archive_%j.err"
-        " --wrap='surf-archiver-cli archive --mode=videos'"
-    )
+    archive_command = _ARCHIVE_SBATCH.format(mode="videos")
     settings: Settings = ctx["settings"]
     async with get_managed_export_ingester(settings) as ingester:
         await ingester.run_sbatch_command(archive_command)
